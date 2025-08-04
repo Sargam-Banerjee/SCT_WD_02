@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MY STOPWATCH</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@300;400;600&display=swap');
+        
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background: linear-gradient(135deg, #0f0f15 0%, #1a1a2e 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+        }
+        
+        .stopwatch-container {
+            perspective: 1000px;
+        }
+        
+        .stopwatch {
+            transform-style: preserve-3d;
+            transition: transform 0.5s ease;
+        }
+        
+        .stopwatch:hover {
+            transform: rotateY(10deg) rotateX(5deg);
+        }
+        
+        .display {
+            text-shadow: 0 0 10px rgba(20, 189, 14, 0.7);
+        }
+        
+        .btn {
+            transition: all 0.3s ease;
+            transform-style: preserve-3d;
+            box-shadow: 0 4px 6px -1px rgba(202, 8, 37, 0.5);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px) translateZ(10px);
+        }
+        
+        .btn:active {
+            transform: translateY(1px);
+        }
+        
+        .btn-start {
+            box-shadow: 0 0 15px rgba(74, 222, 128, 0.5);
+        }
+        
+        .btn-pause {
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.5);
+        }
+        
+        .btn-reset {
+            box-shadow: 0 0 15px rgba(248, 113, 113, 0.5);
+        }
+        
+        .btn-lap {
+            box-shadow: 0 0 15px rgba(96, 165, 250, 0.5);
+        }
+        
+        .lap-item {
+            animation: fadeIn 0.5s ease-out;
+            border-left: 3px solid #46d078;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .lap-divider {
+            border-color: rgba(60, 203, 112, 0.2);
+        }
+        
+        .glow {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 0.7; }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    <div class="stopwatch-container w-full max-w-md">
+        <div class="stopwatch bg-gray-900 rounded-3xl p-8 shadow-2xl border border-gray-800">
+            <h1 class="text-3xl font-bold text-center mb-6 font-['Orbitron'] text-green-400 glow">MY STOPWATCH</h1>
+            
+            <div class="display bg-gray-800 rounded-xl p-6 mb-8 text-center border border-gray-700">
+                <div class="text-5xl md:text-6xl font-mono font-bold text-green-400 tracking-tighter px-2" id="display">00:00:00.00</div>
+            </div>
+            
+            <div class="controls flex justify-center space-x-4 mb-8">
+                <button id="startBtn" class="btn btn-start bg-green-600 hover:bg-green-700 active:bg-green-800 text-white rounded-full w-16 h-16 flex items-center justify-center transform hover:scale-110 active:scale-95 transition-transform duration-200">
+                    <i class="fas fa-play text-xl"></i>
+                </button>
+                <button id="pauseBtn" class="btn btn-pause bg-yellow-500 hover:bg-yellow-600 active:bg-yellow-700 text-white rounded-full w-16 h-16 flex items-center justify-center hidden transform hover:scale-110 active:scale-95 transition-transform duration-200">
+                    <i class="fas fa-pause text-xl"></i>
+                </button>
+                <button id="resetBtn" class="btn btn-reset bg-red-500 hover:bg-red-600 active:bg-red-700 text-white rounded-full w-16 h-16 flex items-center justify-center transform hover:scale-110 active:scale-95 transition-transform duration-200">
+                    <i class="fas fa-redo text-xl"></i>
+                </button>
+                <button id="lapBtn" class="btn btn-lap bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white rounded-full w-16 h-16 flex items-center justify-center transform hover:scale-110 active:scale-95 transition-transform duration-200">
+                    <i class="fas fa-flag text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="laps-container max-h-64 overflow-y-auto pr-2">
+                <div class="text-center text-gray-400 mb-2 font-['Orbitron']">LAP TIMES</div>
+                <div id="lapsList" class="divide-y lap-divider"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const display = document.getElementById('display');
+            const startBtn = document.getElementById('startBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const lapBtn = document.getElementById('lapBtn');
+            const lapsList = document.getElementById('lapsList');
+            
+            let startTime;
+            let elapsedTime = 0;
+            let timerInterval;
+            let lapCount = 1;
+            
+            // Format time as HH:MM:SS.mm
+            function formatTime(time) {
+                const date = new Date(time);
+                const hours = date.getUTCHours().toString().padStart(2, '0');
+                const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+                const seconds = date.getUTCSeconds().toString().padStart(2, '0');
+                const milliseconds = Math.floor(date.getUTCMilliseconds() / 10).toString().padStart(2, '0');
+                
+                return `${hours}:${minutes}:${seconds}.${milliseconds}`;
+            }
+            
+            // Update the display
+            function updateDisplay() {
+                display.textContent = formatTime(elapsedTime);
+            }
+            
+            // Start the stopwatch
+            function startTimer() {
+                startTime = Date.now() - elapsedTime;
+                timerInterval = setInterval(() => {
+                    elapsedTime = Date.now() - startTime;
+                    updateDisplay();
+                }, 10);
+                
+                startBtn.classList.add('hidden');
+                pauseBtn.classList.remove('hidden');
+            }
+            
+            // Pause the stopwatch
+            function pauseTimer() {
+                clearInterval(timerInterval);
+                startBtn.classList.remove('hidden');
+                pauseBtn.classList.add('hidden');
+            }
+            
+            // Reset the stopwatch
+            function resetTimer() {
+                clearInterval(timerInterval);
+                elapsedTime = 0;
+                updateDisplay();
+                startBtn.classList.remove('hidden');
+                pauseBtn.classList.add('hidden');
+                lapsList.innerHTML = '';
+                lapCount = 1;
+            }
+            
+            // Record a lap time
+            function recordLap() {
+                if (elapsedTime === 0) return;
+                
+                const lapItem = document.createElement('div');
+                lapItem.className = 'lap-item py-2 px-4 bg-gray-800 rounded mb-2 flex justify-between items-center';
+                
+                const lapNumber = document.createElement('span');
+                lapNumber.className = 'text-green-400 font-bold';
+                lapNumber.textContent = `Lap ${lapCount}`;
+                
+                const lapTime = document.createElement('span');
+                lapTime.className = 'font-mono';
+                lapTime.textContent = formatTime(elapsedTime);
+                
+                lapItem.appendChild(lapNumber);
+                lapItem.appendChild(lapTime);
+                
+                // Add animation class temporarily
+                lapItem.classList.add('animate-pulse');
+                setTimeout(() => {
+                    lapItem.classList.remove('animate-pulse');
+                }, 500);
+                
+                lapsList.prepend(lapItem);
+                lapCount++;
+                
+                // Scroll to top of laps list
+                lapsList.scrollTop = 0;
+            }
+            
+            // Event listeners
+            startBtn.addEventListener('click', startTimer);
+            pauseBtn.addEventListener('click', pauseTimer);
+            resetBtn.addEventListener('click', resetTimer);
+            lapBtn.addEventListener('click', recordLap);
+            
+            // Initialize display
+            updateDisplay();
+            
+            // Add 3D tilt effect on mouse move
+            const stopwatch = document.querySelector('.stopwatch');
+            document.addEventListener('mousemove', (e) => {
+                const xAxis = (window.innerWidth / 2 - e.pageX) / 25;
+                const yAxis = (window.innerHeight / 2 - e.pageY) / 25;
+                stopwatch.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+            });
+            
+            // Reset position when mouse leaves
+            document.addEventListener('mouseleave', () => {
+                stopwatch.style.transform = 'rotateY(0) rotateX(0)';
+            });
+        });
+    </script>
+</body>
+</html>
